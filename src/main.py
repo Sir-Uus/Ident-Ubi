@@ -1,29 +1,96 @@
 import flet as ft
 import asyncio
+import sqlite3
+import hashlib
+import os
+
+DB_PATH = "users.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def register_user(username: str, password: str) -> tuple[bool, str]:
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO users (username, password) VALUES (?, ?)",
+            (username.strip(), hash_password(password))
+        )
+        conn.commit()
+        conn.close()
+        return True, "Berhasil didaftarkan!"
+    except sqlite3.IntegrityError:
+        return False, "Username sudah digunakan!"
+    except Exception as e:
+        return False, f"Error: {str(e)}"
+    finally:
+        conn.close()
+
+def login_user(username: str, password: str) -> tuple[bool, str]:
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, username FROM users WHERE username = ? AND password = ?",
+            (username.strip(), hash_password(password))
+        )
+        user = cursor.fetchone()
+        conn.close()
+        if user:
+            return True, user[1] 
+        else:
+            return False, "Username atau password salah!"
+    except Exception as e:
+        return False, f"Error: {str(e)}"
+
+init_db()
 
 MOCK_DATA_UBI = {
     1: {
-        "nama": "Ubi Cilembu",
-        "deskripsi": "Ubi khas Sumedang yang terkenal dengan rasa manis seperti madu ketika dipanggang.",
-        "perawatan": "1. Penyiraman rutin 1-2 kali sehari.\n2. Pastikan tanah gembur.\n3. Panen umur 4-5 bulan.",
-        "warna": ft.Colors.ORANGE_700,
-        "icon": ft.Icons.GRASS,
-    },
-    2: {
-        "nama": "Ubi Jalar Ungu",
+        "nama": "Ubi Jalar",
         "deskripsi": "Ubi yang memiliki warna ungu pekat kaya akan antioksidan.",
-        "perawatan": "1. Sinar matahari penuh.\n2. Lakukan pendangiran berkala.\n3. Beri pupuk organik.",
+        "perawatan": "1. Lakukan penggemburan tanah.\n2. Angkat dan balikkan batang-batang yang menjalar setiap beberapa minggu.\n3. Berikan pupuk yang mengandung Nitrogen  .",
         "warna": ft.Colors.PURPLE_700,
         "icon": ft.Icons.ECO,
     },
-    3: {
-        "nama": "Singkong (Ubi Kayu)",
+    2: {
+        "nama": "Singkong",
         "deskripsi": "Tanaman perdu tahunan tropika yang dimanfaatkan umbi dan daunnya.",
-        "perawatan": "1. Tanam stek batang berkualitas.\n2. Penyiangan gulma penting.\n3. Panen usia 7-9 bulan.",
+        "perawatan": "1. Lakukan penyiangan pada 2-4 minggu.\n2. Menggemburkan tanah.\n3. Gunakan kombinasi urea.\n4. Pastikan tanah tetap lembap.",
         "warna": ft.Colors.BROWN_600,
         "icon": ft.Icons.NATURE,
     },
+    3: {
+        "nama": "Kentang",
+        "deskripsi": "Umbi batang yang kaya karbohidrat, cocok ditanam di dataran tinggi.",
+        "perawatan": "1. timbun pangkal batang dengan tanah.\n2. Gunakan pestisida nabati.\n3. potong batang atas dan biarkan umbi di dalam tanah SEBELUM DIGALI.",
+        "warna": ft.Colors.AMBER_700,
+        "icon": ft.Icons.CIRCLE,
+    },
+    4: {
+        "nama": "Talas",
+        "deskripsi": "Umbi tropis yang kaya serat dan cocok untuk berbagai olahan makanan.",
+        "perawatan": "1. Sukai tanah lembap dan teduh.\n2. Siram setiap hari di musim kemarau.\n3. Beri pupuk kandang sebulan sekali.\n4. Panen umur 6-9 bulan.",
+        "warna": ft.Colors.GREEN_800,
+        "icon": ft.Icons.PARK,
+    },
 }
+
 
 BIRU_LANGIT = "#87CEEB"
 BIRU_TUA = "#1a2a5e"
@@ -36,7 +103,7 @@ def main(page: ft.Page):
     page.title = "Aplikasi Jenis Umbi"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.bgcolor = BIRU_LANGIT
-    page.fonts = {"Cochon" : "Petit_Cochon.ttf"}
+    page.fonts = {"Cochon": "Petit_Cochon.ttf"}
 
     def build_splash_view():
         return ft.View(
@@ -152,11 +219,17 @@ def main(page: ft.Page):
         lbl_error = ft.Text(value="", color=ft.Colors.RED_400)
 
         def login_clicked(e):
-            if txt_username.value and txt_password.value:
+            if not txt_username.value or not txt_password.value:
+                lbl_error.value = "Isi username dan password!"
+                page.update()
+                return
+
+            sukses, pesan = login_user(txt_username.value, txt_password.value)
+            if sukses:
                 lbl_error.value = ""
                 navigate_to("dashboard")
             else:
-                lbl_error.value = "Isi username dan password!"
+                lbl_error.value = pesan
                 page.update()
 
         return ft.View(
@@ -192,11 +265,6 @@ def main(page: ft.Page):
                                 font_family="Cochon",
                                 weight=ft.FontWeight.W_900,
                                 color=BIRU_TUA,
-                            ),
-                            ft.Text(
-                                "Masuk ke akun Anda",
-                                size=14,
-                                color=ft.Colors.GREY_600,
                             ),
                             ft.Container(height=20),
                             ft.Container(
@@ -278,12 +346,20 @@ def main(page: ft.Page):
                 lbl_status.value = "Isi dulu datanya!"
                 lbl_status.color = ft.Colors.RED_400
                 page.update()
-            else:
+                return
+
+            sukses, pesan = register_user(txt_username.value, txt_password.value)
+            if sukses:
                 lbl_status.value = "Berhasil! Kembali ke login..."
                 lbl_status.color = HIJAU_RUMPUT
                 page.update()
                 await asyncio.sleep(1)
                 navigate_to("login")
+            else:
+                lbl_status.value = pesan
+                lbl_status.color = ft.Colors.RED_400
+                page.update()
+
 
         return ft.View(
             controls=[
@@ -371,71 +447,47 @@ def main(page: ft.Page):
         )
 
     def build_dashboard_view():
-        list_pilihan = []
-        for ubi_id, data in MOCK_DATA_UBI.items():
-            warna = data["warna"]
-            list_pilihan.append(
-                ft.Container(
-                    margin=ft.Margin(0, 0, 0, 12),
-                    border_radius=16,
-                    bgcolor=ft.Colors.WHITE,
+        def buat_kartu(nama, img_src, tanaman_key):
+            return ft.GestureDetector(
+                on_tap=lambda _, k=tanaman_key: go_to_detail(k),
+                content=ft.Container(
+                    width=160,
+                    height=180,
+                    border_radius=24,
+                    bgcolor="#F5A623",
+                    clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
                     shadow=ft.BoxShadow(
-                        blur_radius=10,
-                        color=ft.Colors.with_opacity(0.1, ft.Colors.BLACK),
-                        offset=ft.Offset(0, 3),
+                        blur_radius=12,
+                        color=ft.Colors.with_opacity(0.25, ft.Colors.BLACK),
+                        offset=ft.Offset(0, 4),
                     ),
-                    content=ft.Row(
+                    content=ft.Stack(
                         controls=[
                             ft.Container(
-                                width=70,
-                                height=90,
-                                border_radius=ft.BorderRadius(
-                                    top_left=16,
-                                    bottom_left=16,
-                                    top_right=0,
-                                    bottom_right=0,
-                                ),
-                                bgcolor=warna,
-                                alignment=ft.Alignment(0, 0),
-                                content=ft.Icon(
-                                    data["icon"], size=36, color=ft.Colors.WHITE
+                                width=160,
+                                height=180,
+                                image=ft.DecorationImage(
+                                    src=img_src,
+                                    fit=ft.BoxFit.CONTAIN,
+                                    opacity=0.35,
                                 ),
                             ),
                             ft.Container(
-                                expand=True,
-                                padding=ft.Padding(12, 10, 8, 10),
-                                content=ft.Column(
-                                    spacing=4,
-                                    controls=[
-                                        ft.Text(
-                                            data["nama"],
-                                            weight=ft.FontWeight.BOLD,
-                                            size=15,
-                                            color=BIRU_TUA,
-                                        ),
-                                        ft.Text(
-                                            data["deskripsi"],
-                                            size=12,
-                                            color=ft.Colors.GREY_600,
-                                            max_lines=2,
-                                            overflow=ft.TextOverflow.ELLIPSIS,
-                                        ),
-                                        ft.TextButton(
-                                            "Lihat Perawatan →",
-                                            on_click=lambda _, uid=ubi_id: go_to_detail(
-                                                uid
-                                            ),
-                                            style=ft.ButtonStyle(
-                                                color=HIJAU_RUMPUT,
-                                                padding=ft.Padding(0, 0, 0, 0),
-                                            ),
-                                        ),
-                                    ],
+                                width=160,
+                                height=180,
+                                alignment=ft.Alignment(0, 0.6),
+                                content=ft.Text(
+                                    nama.upper(),
+                                    size=16,
+                                    weight=ft.FontWeight.W_900,
+                                    color=BIRU_TUA,
+                                    text_align=ft.TextAlign.CENTER,
+                                    font_family="Cochon",
                                 ),
                             ),
                         ],
                     ),
-                )
+                ),
             )
 
         return ft.View(
@@ -447,33 +499,42 @@ def main(page: ft.Page):
                     ),
                     content=ft.Column(
                         expand=True,
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                         controls=[
+                            ft.Container(height=20),
                             ft.Container(
-                                padding=ft.Padding(20, 20, 20, 16),
-                                content=ft.Column(
-                                    spacing=4,
-                                    controls=[
-                                        ft.Text(
-                                            "Jenis Umbi",
-                                            size=24,
-                                            weight=ft.FontWeight.W_900,
-                                            color=BIRU_TUA,
-                                        ),
-                                        ft.Text(
-                                            "Pilih umbi untuk melihat cara perawatannya",
-                                            size=13,
-                                            color=ft.Colors.GREY_700,
-                                        ),
-                                    ],
+                                padding=ft.Padding(20, 0, 20, 0),
+                                content=ft.Text(
+                                    "JENIS UMBI UMBIAN",
+                                    size=36,
+                                    weight=ft.FontWeight.W_900,
+                                    font_family="Cochon",
+                                    color=BIRU_TUA,
+                                    text_align=ft.TextAlign.CENTER,
                                 ),
                             ),
-                            ft.Container(
-                                expand=True,
-                                padding=ft.Padding(16, 0, 16, 0),
-                                content=ft.ListView(
-                                    controls=list_pilihan,
-                                    expand=True,
-                                ),
+                            ft.Container(height=30),
+                            ft.Column(
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                spacing=20,
+                                controls=[
+                                    ft.Row(
+                                        alignment=ft.MainAxisAlignment.CENTER,
+                                        spacing=20,
+                                        controls=[
+                                            buat_kartu("Singkong", "singkong.png", 2),
+                                            buat_kartu("Kentang", "kentang.png", 3),
+                                        ],
+                                    ),
+                                    ft.Row(
+                                        alignment=ft.MainAxisAlignment.CENTER,
+                                        spacing=20,
+                                        controls=[
+                                            buat_kartu("Ubi Jalar", "ubi_jalar.png", 1),
+                                            buat_kartu("Talas", "talas.png", 4),
+                                        ],
+                                    ),
+                                ],
                             ),
                         ],
                     ),
@@ -485,6 +546,7 @@ def main(page: ft.Page):
                     "JENIS UMBI",
                     color=ft.Colors.WHITE,
                     weight=ft.FontWeight.W_900,
+                    font_family="Cochon",
                     style=ft.TextStyle(letter_spacing=2),
                 ),
                 bgcolor=BIRU_TUA,
@@ -504,125 +566,116 @@ def main(page: ft.Page):
 
     def build_detail_view(ubi_id: int):
         if not ubi_id or ubi_id not in MOCK_DATA_UBI:
-            body = ft.Text("Data tidak ditemukan")
+            data = None
         else:
             data = MOCK_DATA_UBI[ubi_id]
-            warna = data["warna"]
 
-            perawatan_items = []
-            for baris in data["perawatan"].split("\n"):
-                if baris.strip():
-                    perawatan_items.append(
-                        ft.Container(
-                            margin=ft.Margin(0, 0, 0, 10),
-                            padding=ft.Padding(12, 12, 12, 12),
-                            border_radius=10,
-                            bgcolor=ft.Colors.WHITE,
-                            shadow=ft.BoxShadow(
-                                blur_radius=6,
-                                color=ft.Colors.with_opacity(0.08, ft.Colors.BLACK),
-                            ),
-                            content=ft.Row(
-                                controls=[
-                                    ft.Icon(
-                                        ft.Icons.CHECK_CIRCLE,
-                                        color=HIJAU_RUMPUT,
-                                        size=20,
-                                    ),
-                                    ft.Container(width=10),
-                                    ft.Text(
-                                        baris.strip(),
-                                        size=14,
-                                        color=BIRU_TUA,
-                                        expand=True,
-                                    ),
-                                ],
-                                vertical_alignment=ft.CrossAxisAlignment.START,
-                            ),
-                        )
-                    )
-
-            body = ft.Column(
-                scroll=ft.ScrollMode.AUTO,
-                expand=True,
-                controls=[
-                    ft.Container(
-                        width=float("inf"),
-                        padding=ft.Padding(24, 24, 24, 24),
-                        border_radius=ft.BorderRadius(
-                            top_left=0,
-                            top_right=0,
-                            bottom_left=24,
-                            bottom_right=24,
-                        ),
-                        gradient=ft.LinearGradient(
-                            begin=ft.Alignment(-1, -1),
-                            end=ft.Alignment(1, 1),
-                            colors=[warna, BIRU_TUA],
-                        ),
-                        content=ft.Column(
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                            controls=[
-                                ft.Icon(data["icon"], size=60, color=ft.Colors.WHITE),
-                                ft.Container(height=8),
-                                ft.Text(
-                                    data["nama"],
-                                    size=22,
-                                    weight=ft.FontWeight.BOLD,
-                                    color=ft.Colors.WHITE,
-                                    text_align=ft.TextAlign.CENTER,
-                                ),
-                            ],
-                        ),
-                    ),
-                    ft.Container(
-                        padding=ft.Padding(20, 20, 20, 20),
-                        content=ft.Column(
-                            spacing=12,
-                            controls=[
-                                ft.Text(
-                                    "Deskripsi",
-                                    size=16,
-                                    weight=ft.FontWeight.BOLD,
-                                    color=BIRU_TUA,
-                                ),
-                                ft.Container(
-                                    padding=ft.Padding(16, 16, 16, 16),
-                                    border_radius=12,
-                                    bgcolor=ft.Colors.WHITE,
-                                    shadow=ft.BoxShadow(
-                                        blur_radius=8,
-                                        color=ft.Colors.with_opacity(
-                                            0.08, ft.Colors.BLACK
-                                        ),
-                                    ),
-                                    content=ft.Text(
-                                        data["deskripsi"],
-                                        size=14,
-                                        color=ft.Colors.GREY_800,
-                                    ),
-                                ),
-                                ft.Container(height=4),
-                                ft.Text(
-                                    "Cara Perawatan",
-                                    size=16,
-                                    font_family="Cochon",
-                                    weight=ft.FontWeight.BOLD,
-                                    color=BIRU_TUA,
-                                ),
-                                *perawatan_items,
-                            ],
-                        ),
-                    ),
-                ],
+        if not data:
+            return ft.View(
+                controls=[ft.Text("Data tidak ditemukan")],
+                route="/detail",
             )
+
+        perawatan_items = []
+        for baris in data["perawatan"].split("\n"):
+            baris = baris.strip()
+            if baris:
+                teks = baris.lstrip("0123456789. ")
+                perawatan_items.append(
+                    ft.Text(
+                        f"-{teks.upper()}",
+                        size=18,
+                        weight=ft.FontWeight.W_900,
+                        color=BIRU_TUA,
+                        text_align=ft.TextAlign.CENTER,
+                    )
+                )
 
         return ft.View(
             controls=[
                 ft.Container(
                     expand=True,
-                    bgcolor=PUTIH_CLOUD,
-                    content=body,
+                    image=ft.DecorationImage(
+                        src="ubi_background.png", fit=ft.BoxFit.COVER
+                    ),
+                    content=ft.Column(
+                        expand=True,
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        spacing=0,
+                        controls=[
+                            ft.Container(height=16),
+                            ft.Container(
+                                padding=ft.Padding(20, 0, 20, 0),
+                                content=ft.Text(
+                                    "CARA PERAWATANNYA",
+                                    size=34,
+                                    weight=ft.FontWeight.W_900,
+                                    font_family="Cochon",
+                                    color=BIRU_TUA,
+                                    text_align=ft.TextAlign.CENTER,
+                                ),
+                            ),
+                            ft.Container(height=16),
+                            ft.Container(
+                                width=140,
+                                height=160,
+                                border_radius=20,
+                                bgcolor="#F5A623",
+                                clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+                                shadow=ft.BoxShadow(
+                                    blur_radius=12,
+                                    color=ft.Colors.with_opacity(0.25, ft.Colors.BLACK),
+                                    offset=ft.Offset(0, 4),
+                                ),
+                                content=ft.Stack(
+                                    controls=[
+                                        ft.Container(
+                                            width=140,
+                                            height=160,
+                                            image=ft.DecorationImage(
+                                                src=f"{data['nama'].lower().replace(' ', '_').replace('(', '').replace(')', '')}.png",
+                                                fit=ft.BoxFit.CONTAIN,
+                                                opacity=0.4,
+                                            ),
+                                        ),
+                                        ft.Container(
+                                            width=140,
+                                            height=160,
+                                            alignment=ft.Alignment(0, 0.6),
+                                            content=ft.Text(
+                                                data["nama"].upper(),
+                                                size=13,
+                                                weight=ft.FontWeight.W_900,
+                                                font_family="Cochon",
+                                                color=BIRU_TUA,
+                                                text_align=ft.TextAlign.CENTER,
+                                            ),
+                                        ),
+                                    ],
+                                ),
+                            ),
+                            ft.Container(height=20),
+                            ft.Container(
+                                expand=True,
+                                margin=ft.Margin(24, 0, 24, 80),
+                                border_radius=20,
+                                border=ft.Border(
+                                    left=ft.BorderSide(4, "#7090d0"),
+                                    right=ft.BorderSide(4, "#7090d0"),
+                                    top=ft.BorderSide(4, "#7090d0"),
+                                    bottom=ft.BorderSide(4, "#7090d0"),
+                                ),
+                                bgcolor=ft.Colors.with_opacity(0.55, "#b8c8f0"),
+                                padding=ft.Padding(20, 24, 20, 24),
+                                content=ft.Column(
+                                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                    spacing=16,
+                                    scroll=ft.ScrollMode.AUTO,
+                                    controls=perawatan_items,
+                                ),
+                            ),
+                        ],
+                    ),
                 )
             ],
             route="/detail",
@@ -640,6 +693,19 @@ def main(page: ft.Page):
                 ),
                 automatically_imply_leading=False,
             ),
+            floating_action_button=ft.FloatingActionButton(
+                content=ft.Text(
+                    "BACK",
+                    size=14,
+                    weight=ft.FontWeight.W_900,
+                    font_family="Cochon",
+                    color=BIRU_TUA,
+                ),
+                bgcolor=ft.Colors.WHITE,
+                on_click=lambda _: navigate_back(),
+                mini=False,
+            ),
+            floating_action_button_location=ft.FloatingActionButtonLocation.END_FLOAT,
             padding=0,
         )
 
