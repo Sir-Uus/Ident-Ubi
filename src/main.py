@@ -6,6 +6,7 @@ import os
 
 DB_PATH = "users.db"
 
+
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -20,8 +21,10 @@ def init_db():
     conn.commit()
     conn.close()
 
+
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
+
 
 def register_user(username: str, password: str) -> tuple[bool, str]:
     try:
@@ -29,7 +32,7 @@ def register_user(username: str, password: str) -> tuple[bool, str]:
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO users (username, password) VALUES (?, ?)",
-            (username.strip(), hash_password(password))
+            (username.strip(), hash_password(password)),
         )
         conn.commit()
         conn.close()
@@ -41,22 +44,24 @@ def register_user(username: str, password: str) -> tuple[bool, str]:
     finally:
         conn.close()
 
+
 def login_user(username: str, password: str) -> tuple[bool, str]:
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute(
             "SELECT id, username FROM users WHERE username = ? AND password = ?",
-            (username.strip(), hash_password(password))
+            (username.strip(), hash_password(password)),
         )
         user = cursor.fetchone()
         conn.close()
         if user:
-            return True, user[1] 
+            return True, user[1]
         else:
             return False, "Username atau password salah!"
     except Exception as e:
         return False, f"Error: {str(e)}"
+
 
 init_db()
 
@@ -64,30 +69,44 @@ MOCK_DATA_UBI = {
     1: {
         "nama": "Ubi Jalar",
         "deskripsi": "Ubi yang memiliki warna ungu pekat kaya akan antioksidan.",
-        "perawatan": "1. Lakukan penggemburan tanah.\n2. Angkat dan balikkan batang-batang yang menjalar setiap beberapa minggu.\n3. Berikan pupuk yang mengandung Nitrogen  .",
+        "perawatan": "1. Lakukan penggemburan tanah.\n2. Angkat dan balikkan batang-batang yang menjalar setiap beberapa minggu.\n3. Berikan pupuk yang mengandung Nitrogen.\n4. Memotong sebagian pucuk atau daun yang tumbuh terlalu rimbun.",
         "warna": ft.Colors.PURPLE_700,
         "icon": ft.Icons.ECO,
     },
     2: {
         "nama": "Singkong",
         "deskripsi": "Tanaman perdu tahunan tropika yang dimanfaatkan umbi dan daunnya.",
-        "perawatan": "1. Lakukan penyiangan pada 2-4 minggu.\n2. Menggemburkan tanah.\n3. Gunakan kombinasi urea.\n4. Pastikan tanah tetap lembap.",
+        "perawatan": "1. Lakukan penyiangan pada 2-4 minggu.\n2. Menggemburkan tanah.\n3. Gunakan kombinasi urea.\n4. Pastikan tanah tetap lembap.\n5. Pastikan air cukup pada 5 bulan pertama, namun hindari tanah becek.\n6. Bersihkan rumput liar (gulma) di sekitar tanaman secara berkala",
         "warna": ft.Colors.BROWN_600,
         "icon": ft.Icons.NATURE,
     },
     3: {
         "nama": "Kentang",
         "deskripsi": "Umbi batang yang kaya karbohidrat, cocok ditanam di dataran tinggi.",
-        "perawatan": "1. timbun pangkal batang dengan tanah.\n2. Gunakan pestisida nabati.\n3. potong batang atas dan biarkan umbi di dalam tanah SEBELUM DIGALI.",
+        "perawatan": "1. Hindari umbi terkena sinar matahari langsung karena dapat menyebabkan umbi menjadi hijau dan beracun.\n2. Pertahankan kelembapan tanah yang stabil selama fase pembentukan umbi.\n3. Kurangi penyiraman menjelang panen untuk mencegah umbi membusuk.\n4. Gunakan bibit kentang bersertifikat dan bebas penyakit.\n5. Buang tunas atau tanaman yang terserang penyakit agar tidak menular ke tanaman lain.\n6. Kendalikan penyakit busuk daun (late blight) yang merupakan penyakit utama pada kentang.\n7. Lakukan rotasi tanaman dan hindari menanam kentang pada lahan yang sama secara terus-menerus.\n8. Berikan pupuk kalium lebih tinggi saat pembentukan umbi.",
         "warna": ft.Colors.AMBER_700,
         "icon": ft.Icons.CIRCLE,
     },
     4: {
         "nama": "Talas",
         "deskripsi": "Umbi tropis yang kaya serat dan cocok untuk berbagai olahan makanan.",
-        "perawatan": "1. Sukai tanah lembap dan teduh.\n2. Siram setiap hari di musim kemarau.\n3. Beri pupuk kandang sebulan sekali.\n4. Panen umur 6-9 bulan.",
+        "perawatan": "1. Hindari genangan air berkepanjangan yang dapat menyebabkan busuk umbi.\n2. Lakukan penyiangan gulma secara rutin agar tidak bersaing memperebutkan unsur hara.\n3. Tambahkan pupuk organik atau kompos untuk mendukung pertumbuhan umbi.\n4. Lakukan pembumbunan ringan di sekitar pangkal tanaman jika umbi mulai muncul ke permukaan.\n5. Pangkas daun tua atau rusak untuk mengurangi risiko penyakit.\n6. Pantau hama seperti ulat dan kutu daun.",
         "warna": ft.Colors.GREEN_800,
         "icon": ft.Icons.PARK,
+    },
+    5: {
+        "nama": "Bit",
+        "deskripsi": "Umbi akar berwarna merah gelap yang kaya antioksidan, sering diolah menjadi jus atau salad.",
+        "perawatan": "1. Pastikan tanaman mendapat pasokan air yang konsisten dan merata.\n2. Gunakan pupuk yang kaya akan Kalium (K) dan Fosfor (P) untuk pertumbuhan umbi.\n3. Jaga sirkulasi udara dengan memberikan jarak tanam yang cukup.\n4. Lakukan penyiraman langsung ke area tanah, bukan pada daun.",
+        "warna": ft.Colors.RED_800,
+        "icon": ft.Icons.SPA,
+    },
+    6: {
+        "nama": "Lobak",
+        "deskripsi": "Sayuran umbi bertekstur renyah dan segar yang sangat baik untuk pencernaan.",
+        "perawatan": "1. Lakukan penyiraman secara teratur agar tanah tetap lembap, tetapi tidak becek.\n2. Jaga jarak tanam yang cukup untuk mendukung perkembangan umbi.\n3. Lakukan penjarangan bibit setelah tanaman tumbuh agar umbi dapat berkembang optimal.\n4. Berikan pupuk organik (kompos atau pupuk kandang matang) sebelum tanam.\n5. Hindari pemberian pupuk nitrogen berlebihan karena dapat menyebabkan daun tumbuh lebih banyak daripada umbi.",
+        "warna": ft.Colors.TEAL_700,
+        "icon": ft.Icons.ECO,
     },
 }
 
@@ -360,7 +379,6 @@ def main(page: ft.Page):
                 lbl_status.color = ft.Colors.RED_400
                 page.update()
 
-
         return ft.View(
             controls=[
                 ft.Container(
@@ -534,6 +552,14 @@ def main(page: ft.Page):
                                             buat_kartu("Talas", "talas.png", 4),
                                         ],
                                     ),
+                                    ft.Row(
+                                        alignment=ft.MainAxisAlignment.CENTER,
+                                        spacing=20,
+                                        controls=[
+                                            buat_kartu("Bit", "bit.png", 5),
+                                            buat_kartu("Lobak", "lobak.png", 6),
+                                        ],
+                                    ),
                                 ],
                             ),
                         ],
@@ -584,7 +610,7 @@ def main(page: ft.Page):
                 perawatan_items.append(
                     ft.Text(
                         f"-{teks.upper()}",
-                        size=18,
+                        size=12,
                         weight=ft.FontWeight.W_900,
                         color=BIRU_TUA,
                         text_align=ft.TextAlign.CENTER,
